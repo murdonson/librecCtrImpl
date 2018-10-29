@@ -6,8 +6,13 @@ from sklearn.model_selection import StratifiedKFold
 import numpy as np
 from Model.Util import config
 from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, recall_score
-
+from Model.Util.TensorflowExport import TensorflowExport
 class DataUtil:
+
+    def __init__(self):
+        self.count=0
+
+
     def load_data(self):
         dftrain = pd.read_csv(config.TRAIN_FILE)
         dftest = pd.read_csv(config.TEST_FILE)
@@ -28,6 +33,7 @@ class DataUtil:
     def get_batch(self, Xi, Xv, y, batch_size, index):
         start = index * batch_size
         end = (index + 1) * batch_size
+
         end = end if end < len(y) else len(y)
         return Xi[start:end], Xv[start:end], [[y_] for y_ in y[start:end]]
 
@@ -52,11 +58,16 @@ class DataUtil:
         feed_dict = {model.feat_index: Xi,
                      model.feat_value: Xv,
                      model.label: y,
-                     model.dropout_keep_deep: [1.0] * len(model.dropout_dep),
-                     model.train_phase: True}
+                     # model.dropout_keep_deep: [1.0] * len(model.dropout_dep),
+                     # model.train_phase: True
+                     }
 
         _, loss, pred = model.sess.run([model.optimizer, model.loss, model.out], feed_dict=feed_dict)
         pred = np.array(pred).reshape(-1, )
+
+        # export = TensorflowExport()
+        # export.save_content(pred,'pred_'+str(self.count),'nfm')
+        # self.count+=1
         accuracy = accuracy_score(np.array(y).reshape(-1, ), np.where(pred > 0.5, 1, 0))
         return loss, accuracy
 
@@ -64,9 +75,10 @@ class DataUtil:
 
         feed_dict = {model.feat_index: Xi,
                      model.feat_value: Xv,
-                     model.label: y,
-                     model.dropout_keep_deep: model.dropout_dep,
-                     model.train_phase: True}
+                     model.label: y
+                     # model.dropout_keep_deep: model.dropout_dep,
+                     # model.train_phase: True
+                     }
 
         loss, opt = model.sess.run([model.loss, model.optimizer], feed_dict=feed_dict)
 
@@ -85,4 +97,11 @@ class DataUtil:
                 self.fit_on_batch(model,Xi_batch, Xv_batch, y_batch)
             loss, accuracy = self.predict(model,Xi_valid, Xv_valid, y_valid)
             print("foldIndex", fold_index, "epoch", epoch, "loss", loss, 'accuracy', accuracy)
+
+    def get_batch_withouLabel(self, Xi_test, Xv_test, batch_size, index):
+        start = index * batch_size
+        end = (index + 1) * batch_size
+
+        end = end if end < len(Xi_test) else len(Xi_test)
+        return Xi_test[start:end], Xv_test[start:end]
 

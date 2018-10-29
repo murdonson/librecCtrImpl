@@ -62,9 +62,13 @@ class NFM:
 
             self.feat_index = tf.placeholder(tf.int32, shape=[None, None], name='feat_index')
             self.feat_value = tf.placeholder(tf.float32, shape=[None, None], name='feat_value')
-            self.label = tf.placeholder(tf.float32, shape=[None, 1], name='label')
-            self.dropout_keep_deep = tf.placeholder(tf.float32, shape=[None], name='dropout_deep_deep')
-            self.train_phase = tf.placeholder(tf.bool, name='train_phase')
+            self.label = tf.placeholder("float", shape=[None, 1])
+
+            # self.dropout_keep_deep = tf.placeholder(tf.float32, shape=[None], name='dropout_deep_deep')
+            # self.train_phase = tf.placeholder(tf.bool, name='train_phase')
+
+            self.dropout_keep_deep = [0.5, 0.5, 0.5]
+            self.train_phase = True
 
             self.weights = dict()
             self.weights['feature_embeddings'] = tf.Variable(
@@ -124,17 +128,17 @@ class NFM:
                 self.y_deep = tf.nn.dropout(self.y_deep, self.dropout_keep_deep[i + 1])
 
             # bias
-            self.weights['bias'] = tf.Variable(tf.constant(0.1), name='bias')
-            self.y_bias = self.weights['bias'] * tf.ones_like(self.label)
+            # self.weights['bias'] = tf.Variable(tf.constant(0.1), name='bias')
+
+            # self.y_bias = self.weights['bias'] * tf.ones(shape=(self.feat_value.shape[0],1),dtype=tf.float32)
 
             # out
-            self.out = tf.add_n([self.y_first_order, tf.reduce_sum(self.y_deep, axis=1, keep_dims=True), self.y_bias],
-                                name='output')
+            self.out = tf.add_n([self.y_first_order, tf.reduce_sum(self.y_deep, axis=1, keep_dims=True)],
+                                )
 
-            self.out = tf.nn.sigmoid(self.out)
+            self.out = tf.nn.sigmoid(self.out, name='output')
             self.loss = tf.losses.log_loss(self.label, self.out)
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.999,
-                                                    epsilon=1e-8).minimize(self.loss)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
             init = tf.global_variables_initializer()
             self.sess = tf.Session()
@@ -161,13 +165,20 @@ if __name__ == '__main__':
         Xi_valid_, Xv_valid_, y_valid_ = _get(Xi_train, valid_idx), _get(Xv_train, valid_idx), _get(y_train, valid_idx)
         nfm = NFM(**NFMParams.pnn_params)
         data_util.fit(nfm, i, Xi_train_, Xv_train_, y_train_, Xi_valid_, Xv_valid_, y_valid_)
-        # 导出pb文件
-        if i == (len(folds) - 1):
+        # 第一个fold导出pb文件
+        if i == 0:
             constant_graph = tf.graph_util.convert_variables_to_constants(nfm.sess, nfm.sess.graph_def, ["output"])
             with tf.gfile.FastGFile("frozen_model_afm.pb", mode='wb') as f:
                 f.write(constant_graph.SerializeToString())
 
             export = TensorflowExport()
-            export.save_content(np.array(Xi_valid_), 'feat_index', 'nfm')
-            export.save_content(np.array(Xv_valid_), 'feat_value', 'nfm')
-            export.save_content(np.array(y_valid_), 'label', 'nfm')
+
+            Xi_batch, Xv_batch = data_util.get_batch_withouLabel(Xi_test, Xv_test, nfm.batch_size, 0)
+            export.save_content(np.array(Xi_batch), 'feat_index', 'nfm')
+            export.save_content(np.array(Xv_batch), 'feat_value', 'nfm')
+
+            # export.save_content(np.array(y_valid_).reshape(-1,1), 'label', 'nfm')
+
+            out_eval = nfm.out.eval({nfm.feat_index: Xi_test, nfm.feat_value: Xv_test}, session=nfm.sess)
+            export.save_content(np.array(out_eval), 'predition', 'nfm')
+            break
