@@ -1,2 +1,2 @@
 # ctr_tensorflow
-tensorflow 模型练习
+针对librec deeplearning tf代码实验
