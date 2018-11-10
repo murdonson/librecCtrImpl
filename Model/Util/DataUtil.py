@@ -60,14 +60,12 @@ class DataUtil:
                      model.label: y,
                      # model.dropout_keep_deep: [1.0] * len(model.dropout_dep),
                      # model.train_phase: True
+                     # model.train_phase:1
                      }
 
         _, loss, pred = model.sess.run([model.optimizer, model.loss, model.out], feed_dict=feed_dict)
         pred = np.array(pred).reshape(-1, )
 
-        # export = TensorflowExport()
-        # export.save_content(pred,'pred_'+str(self.count),'nfm')
-        # self.count+=1
         accuracy = accuracy_score(np.array(y).reshape(-1, ), np.where(pred > 0.5, 1, 0))
         return loss, accuracy
 
@@ -75,9 +73,10 @@ class DataUtil:
 
         feed_dict = {model.feat_index: Xi,
                      model.feat_value: Xv,
-                     model.label: y
+                     model.label: y,
                      # model.dropout_keep_deep: model.dropout_dep,
-                     # model.train_phase: True
+                     # model.train_phase: 1
+
                      }
 
         loss, opt = model.sess.run([model.loss, model.optimizer], feed_dict=feed_dict)
